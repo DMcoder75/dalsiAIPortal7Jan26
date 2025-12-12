@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import App from '../App'
+import Experience from '../pages/Experience'
 import EnhancedChatInterface from './EnhancedChatInterface'
 import DalSiAIPage from './DalSiAIPage'
 import DalSiAIViPage from './DalSiAIViPage'
@@ -72,7 +73,7 @@ export default function Router() {
     switch (currentPath) {
       case '/chat':
       case '/experience':
-        return <EnhancedChatInterface />
+        return <Experience />
       
       // Model Overview Pages
       case '/models/dalsi-ai':

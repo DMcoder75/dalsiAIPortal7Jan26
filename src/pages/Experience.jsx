@@ -1,0 +1,603 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
+import logger from '../lib/logger'
+import {
+  Send, Plus, Menu, Settings, Bell, LogOut, Search, Trash2, Heart, Share2,
+  Paperclip, Mic, Globe, Play, Image as ImageIcon, Download, Copy, ThumbsUp,
+  ThumbsDown, MessageCircle, Zap, BookOpen, Code, Stethoscope, TrendingUp,
+  Clock, AlertCircle, CheckCircle, Loader, X, ChevronDown, Sparkles, Crown,
+  Archive, MoreVertical, Edit3, StopCircle, Upload, DollarSign, ChevronLeft
+} from 'lucide-react'
+import logo from '../assets/DalSiAILogo2.png'
+import { checkFriction, logFrictionAction } from '../services/frictionAPI'
+import { trackFunnelStep } from '../services/analyticsAPI'
+import { logChatApiCall, logGuestApiCall, getClientIp } from '../services/apiLogging'
+import {
+  getUsageStatus,
+  incrementGuestMessageCount,
+  canGuestSendMessage,
+  canUserSendMessage,
+  getGuestMessageCount,
+  fetchGuestLimit,
+  fetchPlanLimits,
+  getGuestLimit,
+  clearGuestMessageCount
+} from '../lib/usageTracking'
+import * as dalsiAPI from '../lib/dalsiAPI'
+import { cleanTextForDB } from '../lib/textCleaner'
+
+export default function Experience() {
+  const { user, logout } = useAuth()
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(true)
+  const [currentChat, setCurrentChat] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [inputValue, setInputValue] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [selectedModel, setSelectedModel] = useState('general')
+  const [chatHistory, setChatHistory] = useState([])
+  const [guestMessageCount, setGuestMessageCount] = useState(0)
+  const [guestLimit, setGuestLimit] = useState(5)
+  const [tokenCount, setTokenCount] = useState(0)
+  const [suggestedPrompts, setSuggestedPrompts] = useState([])
+  const [loadingPrompts, setLoadingPrompts] = useState(true)
+  const messagesEndRef = useRef(null)
+
+  const models = [
+    { id: 'general', name: 'DalSiAI Chat', description: 'General AI Assistant' },
+    { id: 'healthcare', name: 'Healthcare AI', description: 'Medical & Health' },
+    { id: 'education', name: 'Education AI', description: 'Learning & Tutoring' },
+    { id: 'code', name: 'Code Generation', description: 'Programming Help' },
+    { id: 'weather', name: 'Weather Sense', description: 'Weather & Climate' }
+  ]
+
+  const templates = [
+    { id: 'email', name: 'Email Writer', description: 'Professional emails', icon: '✉️' },
+    { id: 'summary', name: 'Summary', description: 'Summarize text', icon: '📄' },
+    { id: 'translator', name: 'Translator', description: 'Multi-language', icon: '🌐' },
+    { id: 'tutor', name: 'Tutor', description: 'Learn anything', icon: '🎓' }
+  ]
+
+  const integrations = [
+    { id: 'google-drive', name: 'Google Drive', connected: true, icon: '📁' },
+    { id: 'slack', name: 'Slack', connected: false, icon: '💬' }
+  ]
+
+  // Load chat history and fetch guest limit on mount
+  useEffect(() => {
+    loadChatHistory()
+    
+    if (!user) {
+      // Fetch guest limit from database
+      fetchGuestLimit().then(() => {
+        setGuestLimit(getGuestLimit())
+        setGuestMessageCount(getGuestMessageCount())
+      })
+    } else {
+      // Clear guest message count when user logs in
+      clearGuestMessageCount()
+    }
+  }, [user])
+
+  // Fetch suggested prompts from database using RPC
+  useEffect(() => {
+    const fetchSuggestedPrompts = async () => {
+      try {
+        setLoadingPrompts(true)
+        const { data, error } = await supabase
+          .rpc('get_text_based_prompts', { p_limit: 4 })
+
+        if (error) throw error
+        setSuggestedPrompts(data || [])
+      } catch (error) {
+        logger.error('Error fetching suggested prompts:', error)
+        setSuggestedPrompts([])
+      } finally {
+        setLoadingPrompts(false)
+      }
+    }
+
+    fetchSuggestedPrompts()
+  }, [])
+
+  const loadChatHistory = async () => {
+    try {
+      if (user) {
+        const { data, error } = await supabase
+          .from('chats')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20)
+
+        if (error) throw error
+        setChatHistory(data || [])
+      }
+    } catch (error) {
+      logger.error('Error loading chat history:', error)
+    }
+  }
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  const handleNewChat = async () => {
+    try {
+      if (user) {
+        const { data, error } = await supabase
+          .from('chats')
+          .insert([{
+            user_id: user.id,
+            title: 'New Conversation',
+            model: selectedModel,
+            created_at: new Date().toISOString()
+          }])
+          .select()
+
+        if (error) throw error
+        setCurrentChat(data[0])
+        setMessages([])
+        await loadChatHistory()
+      } else {
+        setCurrentChat({ id: `guest-${Date.now()}`, title: 'New Conversation' })
+        setMessages([])
+      }
+      trackFunnelStep('new_chat_created', { model: selectedModel })
+    } catch (error) {
+      logger.error('Error creating new chat:', error)
+    }
+  }
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim()) return
+
+    // Check guest limit
+    if (!user) {
+      if (!canGuestSendMessage(guestMessageCount, guestLimit)) {
+        logFrictionAction('paywall_shown', 'guest_message_limit')
+        alert(`You've reached your message limit (${guestLimit} messages). Please sign in to continue.`)
+        return
+      }
+      incrementGuestMessageCount()
+      setGuestMessageCount(prev => prev + 1)
+    }
+
+    const userMessage = {
+      id: `msg-${Date.now()}`,
+      role: 'user',
+      content: inputValue,
+      timestamp: new Date()
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setInputValue('')
+    setLoading(true)
+
+    try {
+      // Track funnel step
+      trackFunnelStep('message_sent', { model: selectedModel })
+
+      // Get AI response
+      const response = await dalsiAPI.generateText(selectedModel, inputValue)
+
+      const assistantMessage = {
+        id: `msg-${Date.now()}-response`,
+        role: 'assistant',
+        content: response.message || response,
+        timestamp: new Date()
+      }
+
+      setMessages(prev => [...prev, assistantMessage])
+      setTokenCount((response.tokens || 0))
+
+      // Log API call
+      if (user) {
+        logChatApiCall(user.id, selectedModel, inputValue, response.message || response)
+      } else {
+        logGuestApiCall('guest', selectedModel, inputValue, response.message || response)
+      }
+
+      // Save to database if user is logged in
+      if (user && currentChat) {
+        await supabase.from('messages').insert([
+          {
+            chat_id: currentChat.id,
+            role: 'user',
+            content: cleanTextForDB(inputValue)
+          },
+          {
+            chat_id: currentChat.id,
+            role: 'assistant',
+            content: cleanTextForDB(response.message || response)
+          }
+        ])
+      }
+    } catch (error) {
+      logger.error('Error sending message:', error)
+      const errorMessage = {
+        id: `msg-${Date.now()}-error`,
+        role: 'assistant',
+        content: 'Sorry, there was an error processing your message. Please try again.',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteChat = async (chatId) => {
+    if (!user) return
+    try {
+      await supabase.from('chats').delete().eq('id', chatId)
+      await loadChatHistory()
+      if (currentChat?.id === chatId) {
+        setCurrentChat(null)
+        setMessages([])
+      }
+    } catch (error) {
+      logger.error('Error deleting chat:', error)
+    }
+  }
+
+  const selectedModelObj = models.find(m => m.id === selectedModel)
+
+  return (
+    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      {/* Left Sidebar */}
+      <div className={`${sidebarOpen ? 'w-56' : 'w-0'} bg-card border-r border-border flex flex-col transition-all duration-300 overflow-hidden`}>
+        {/* Logo & Branding */}
+        <div className="p-6 border-b border-border">
+          <a href="/" className="flex items-center gap-3 mb-6 hover:opacity-80 transition-opacity cursor-pointer">
+            <img src={logo} alt="DalSiAI" className="h-10 w-10" />
+            <div>
+              <span className="text-lg font-bold text-foreground">DalSiAI</span>
+              <p className="text-xs text-muted-foreground">AI & Automations</p>
+            </div>
+          </a>
+
+          {/* New Conversation Button */}
+          <button
+            onClick={handleNewChat}
+            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-lg"
+          >
+            <Plus className="w-5 h-5" />
+            New Conversation
+          </button>
+        </div>
+
+        {/* Chat History */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {chatHistory.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No conversations yet</p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3 px-2">Today</p>
+                {chatHistory.slice(0, 3).map(chat => (
+                  <div
+                    key={chat.id}
+                    onClick={() => setCurrentChat(chat)}
+                    className={`p-3 rounded-lg cursor-pointer transition-all duration-200 group ${
+                      currentChat?.id === chat.id
+                        ? 'bg-primary/20 border border-primary/50'
+                        : 'hover:bg-muted'
+                    }`}
+                  >
+                    <p className="text-sm font-medium truncate text-foreground">{chat.title}</p>
+                    <p className="text-xs text-muted-foreground">12 messages</p>
+                  </div>
+                ))}
+              </div>
+
+              {chatHistory.length > 3 && (
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3 px-2">Earlier</p>
+                  {chatHistory.slice(3).map(chat => (
+                    <div
+                      key={chat.id}
+                      onClick={() => setCurrentChat(chat)}
+                      className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                        currentChat?.id === chat.id
+                          ? 'bg-primary/20 border border-primary/50'
+                          : 'hover:bg-muted'
+                      }`}
+                    >
+                      <p className="text-sm font-medium truncate text-foreground">{chat.title}</p>
+                      <p className="text-xs text-muted-foreground">8 messages</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* User Profile / Auth Section */}
+        <div className="p-4 border-t border-border">
+          {user ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
+                  {user.user_metadata?.first_name?.[0]?.toUpperCase() || user.email?.[0].toUpperCase() || 'U'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate text-foreground">{user.user_metadata?.first_name || user.email || 'User'}</p>
+                  <p className="text-xs text-muted-foreground">Pro Plan</p>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                className="w-full flex items-center justify-center gap-2 bg-muted hover:bg-muted/80 text-foreground text-sm font-medium transition-colors py-2 rounded-lg"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-center">
+                <p className="text-sm font-medium text-foreground mb-3">Guest User</p>
+                <p className="text-xs text-muted-foreground mb-4">Sign in to save your conversations</p>
+              </div>
+              <button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-2 px-4 rounded-lg transition-all duration-200 text-sm">
+                Sign In
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="h-16 border-b border-border flex items-center justify-between px-6 bg-background/50 backdrop-blur">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 hover:bg-muted rounded-lg transition-colors"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <button className="px-4 py-2 bg-card hover:bg-card/80 rounded-lg text-sm font-medium transition-colors border border-border">
+                {selectedModelObj?.name || 'Select Model'}
+              </button>
+              <button className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Change Model
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button className="relative p-2 hover:bg-muted rounded-lg transition-colors">
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full"></span>
+            </button>
+            <button className="p-2 hover:bg-muted rounded-lg transition-colors">
+              <Settings className="w-5 h-5" />
+            </button>
+            {!user && (
+              <button className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition-all">
+                Sign In
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Chat Area */}
+        <div className="flex-1 overflow-y-auto flex flex-col items-center p-8">
+          {/* Small Logo - Always Visible */}
+          <div className="w-12 h-12 mx-auto mb-6">
+            <img src={logo} alt="DalSiAI" className="w-full h-full object-contain" />
+          </div>
+          
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center flex-1 text-center max-w-2xl">
+              <h2 className="text-4xl font-bold mb-4 text-foreground">How can I help you today?</h2>
+              <p className="text-muted-foreground text-lg mb-8">Choose a model or start typing your question</p>
+
+              {/* Suggested Prompts Section */}
+              {!loadingPrompts && suggestedPrompts.length > 0 && (
+                <div className="w-full mb-6 max-w-3xl">
+                  <h3 className="text-left text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Suggested Prompts</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {suggestedPrompts.map(prompt => (
+                      <button
+                        key={prompt.id}
+                        onClick={() => setInputValue(prompt.prompt_text)}
+                        className="p-2 bg-card hover:bg-card/80 rounded-lg text-left transition-all border border-border hover:border-primary/50 hover:shadow-lg group"
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                            {prompt.icon_name || '✨'}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-foreground text-sm group-hover:text-primary transition-colors">{prompt.title}</h4>
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{prompt.description}</p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Action Buttons */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <button className="p-4 bg-card hover:bg-card/80 rounded-lg flex flex-col items-center gap-2 transition-colors border border-border hover:border-primary/50">
+                  <Paperclip className="w-6 h-6 text-primary" />
+                  <span className="text-sm text-foreground">Attach</span>
+                </button>
+                <button className="p-4 bg-card hover:bg-card/80 rounded-lg flex flex-col items-center gap-2 transition-colors border border-border hover:border-primary/50">
+                  <Mic className="w-6 h-6 text-primary" />
+                  <span className="text-sm text-foreground">Voice</span>
+                </button>
+                <button className="p-4 bg-card hover:bg-card/80 rounded-lg flex flex-col items-center gap-2 transition-colors border border-border hover:border-primary/50">
+                  <Globe className="w-6 h-6 text-primary" />
+                  <span className="text-sm text-foreground">Web Search</span>
+                </button>
+                <button className="p-4 bg-card hover:bg-card/80 rounded-lg flex flex-col items-center gap-2 transition-colors border border-border hover:border-primary/50">
+                  <ImageIcon className="w-6 h-6 text-primary" />
+                  <span className="text-sm text-foreground">Image</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="w-full max-w-4xl space-y-4">
+              {messages.map(msg => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-xl px-6 py-4 rounded-lg ${
+                      msg.role === 'user'
+                        ? 'bg-primary text-primary-foreground shadow-lg'
+                        : 'bg-card border border-border'
+                    }`}
+                  >
+                    <p className="text-sm leading-relaxed">{msg.content}</p>
+                  </div>
+                </div>
+              ))}
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="bg-card border border-border px-6 py-4 rounded-lg">
+                    <div className="flex gap-2">
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* Input Area */}
+        <div className="border-t border-border bg-background/50 backdrop-blur p-6">
+          <div className="max-w-4xl mx-auto">
+            {!user && (
+              <div className="mb-4 p-4 bg-primary/10 border border-primary/30 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Guest: {guestMessageCount}/{guestLimit} messages</p>
+                  <p className="text-xs text-muted-foreground">Sign in to get unlimited messages</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={e => setInputValue(e.target.value)}
+                  onKeyPress={e => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                  placeholder="Ask anything... (Shift + Enter for new line)"
+                  className="w-full bg-card border border-border rounded-lg px-4 py-3 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-colors"
+                />
+                <button className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                  😊
+                </button>
+              </div>
+              <button
+                onClick={handleSendMessage}
+                disabled={loading || !inputValue.trim()}
+                className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground font-semibold p-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-lg"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+              <span>Token: {tokenCount} / 128K</span>
+              <span>DalSiAI can make mistakes. Consider checking important information.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Sidebar */}
+      <div className={`${rightSidebarOpen ? 'w-64' : 'w-0'} bg-card border-l border-border flex flex-col transition-all duration-300 overflow-hidden`}>
+        <div className="p-6 border-b border-border flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-foreground">Quick Actions</h3>
+          <button
+            onClick={() => setRightSidebarOpen(false)}
+            className="lg:hidden p-2 hover:bg-muted rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          {/* Templates */}
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-4">Templates</p>
+            <div className="space-y-3">
+              {templates.map(template => (
+                <button
+                  key={template.id}
+                  className="w-full p-4 bg-card hover:bg-card/80 rounded-lg text-left transition-colors group border border-border hover:border-primary/50"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl flex-shrink-0">{template.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{template.name}</p>
+                      <p className="text-xs text-muted-foreground">{template.description}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Integrations */}
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-4">Integrations</p>
+            <div className="space-y-3">
+              {integrations.map(integration => (
+                <button
+                  key={integration.id}
+                  className="w-full p-4 bg-card hover:bg-card/80 rounded-lg text-left transition-colors group border border-border hover:border-primary/50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{integration.icon}</span>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{integration.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {integration.connected ? (
+                            <span className="text-green-500">Connected</span>
+                          ) : (
+                            <span>Not connected</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    {integration.connected && (
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

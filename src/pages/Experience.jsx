@@ -26,6 +26,8 @@ import {
 } from '../lib/usageTracking'
 import * as dalsiAPI from '../lib/dalsiAPI'
 import { cleanTextForDB } from '../lib/textCleaner'
+import { getUserApiKey } from '../lib/apiKeyManager'
+import { getGuestUserId } from '../lib/guestUser'
 
 export default function Experience() {
   const { user, logout } = useAuth()
@@ -64,9 +66,37 @@ export default function Experience() {
     { id: 'slack', name: 'Slack', connected: false, icon: '💬' }
   ]
 
-  // Load chat history and fetch guest limit on mount
+  // Load chat history, fetch guest limit, and setup API authentication on mount
   useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        if (user) {
+          // Authenticated user: fetch their API key
+          console.log('🔐 Setting up authenticated user API key...')
+          const apiKey = await getUserApiKey(user.id)
+          if (apiKey) {
+            dalsiAPI.setApiKey(apiKey.id)
+            console.log('✅ User API key set')
+          }
+        } else {
+          // Guest user: fetch guest users API key
+          console.log('👤 Setting up guest user API key...')
+          const guestUserId = await getGuestUserId()
+          if (guestUserId) {
+            const guestApiKey = await getUserApiKey(guestUserId)
+            if (guestApiKey) {
+              dalsiAPI.setApiKey(guestApiKey.id)
+              console.log('✅ Guest API key set')
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error setting up API authentication:', error)
+      }
+    }
+    
     loadChatHistory()
+    initializeAuth()
     
     if (!user) {
       // Fetch guest limit from database

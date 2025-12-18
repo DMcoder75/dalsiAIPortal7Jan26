@@ -5,8 +5,8 @@
  */
 
 import React from 'react'
-import { ChevronDown, ChevronUp, CheckCircle2, Circle, Copy, ExternalLink } from 'lucide-react'
-import { applyProfessionalStyling } from '../lib/responseFormatter'
+import { ChevronDown, ChevronUp, CheckCircle2, Circle, Copy, ExternalLink, Sparkles, MessageCircle } from 'lucide-react'
+import FormattedResponseContent from './FormattedResponseContent'
 
 /**
  * Format and display chat mode response
@@ -21,7 +21,7 @@ export const ChatModeResponse = ({ response, references, followups, onFollowupCl
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Copy Button */}
       <div className="flex justify-end mb-2">
         <button
@@ -38,36 +38,58 @@ export const ChatModeResponse = ({ response, references, followups, onFollowupCl
         {typeof response === 'object' && response.$$typeof ? (
           <div className="text-sm leading-relaxed">{response}</div>
         ) : typeof response === 'string' ? (
-          <div 
-            className="text-sm leading-relaxed space-y-3"
-            dangerouslySetInnerHTML={{ __html: applyProfessionalStyling(response) }}
-          />
+          <FormattedResponseContent text={response} />
         ) : (
           <div className="text-sm leading-relaxed">{response}</div>
         )}
       </div>
 
-      {/* References Section */}
+      {/* References Section - Premium Design */}
       {references && references.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-border">
-          <p className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1">
-            <span>📚</span> References & Sources
-          </p>
-          <div className="space-y-2">
+        <div className="mt-8 pt-6 border-t border-gradient-to-r from-blue-500/30 via-cyan-500/20 to-transparent">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-blue-400" />
+              <h3 className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-300 via-cyan-300 to-blue-400 tracking-wide">
+                REFERENCES & SOURCES
+              </h3>
+            </div>
+            <div className="flex-1 h-px bg-gradient-to-r from-blue-500/30 to-transparent"></div>
+          </div>
+          
+          <div className="grid gap-2.5">
             {references.map((ref, idx) => (
               <a
                 key={idx}
                 href={ref.url || '#'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-start gap-2 p-2 bg-blue-50/50 dark:bg-blue-950/20 rounded hover:bg-blue-100/50 dark:hover:bg-blue-950/40 transition-colors group"
+                className="group relative overflow-hidden rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20"
               >
-                <ExternalLink className="w-3 h-3 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-blue-900 dark:text-blue-100 group-hover:text-blue-700 dark:group-hover:text-blue-200 truncate">
-                    {ref.title || ref}
-                  </p>
-                  {ref.url && <p className="text-xs text-blue-600 dark:text-blue-400 truncate">{ref.url}</p>}
+                {/* Animated background gradient */}
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-cyan-600/5 to-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                
+                {/* Border gradient */}
+                <div className="absolute inset-0 rounded-xl border border-blue-500/30 group-hover:border-blue-400/60 transition-colors duration-300"></div>
+                
+                {/* Content */}
+                <div className="relative px-4 py-3 flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-1">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center group-hover:from-blue-500/40 group-hover:to-cyan-500/40 transition-all duration-300">
+                      <ExternalLink className="w-4 h-4 text-blue-300 group-hover:text-blue-200 transition-colors" />
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-blue-200 group-hover:text-blue-100 transition-colors truncate">
+                      {ref.title || ref}
+                    </p>
+                    {ref.url && (
+                      <p className="text-xs text-blue-400/60 group-hover:text-blue-400/80 truncate mt-1 transition-colors">
+                        {ref.url}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </a>
             ))}
@@ -75,21 +97,53 @@ export const ChatModeResponse = ({ response, references, followups, onFollowupCl
         </div>
       )}
 
-      {/* Follow-up Questions Section */}
+      {/* Follow-up Questions Section - Premium Design */}
       {followups && followups.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-border">
-          <p className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1">
-            <span>💡</span> Follow-up Questions
-          </p>
-          <div className="space-y-2">
+        <div className="mt-8 pt-6 border-t border-gradient-to-r from-purple-500/30 via-pink-500/20 to-transparent">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-purple-400" />
+              <h3 className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-purple-400 tracking-wide">
+                FOLLOW-UP QUESTIONS
+              </h3>
+            </div>
+            <div className="flex-1 h-px bg-gradient-to-r from-purple-500/30 to-transparent"></div>
+          </div>
+          
+          <div className="grid gap-2.5">
             {followups.map((followup, idx) => (
               <button
                 key={idx}
                 onClick={() => onFollowupClick && onFollowupClick(followup)}
-                className="w-full text-left px-3 py-2 text-xs bg-amber-50/50 dark:bg-amber-950/20 rounded hover:bg-amber-100/50 dark:hover:bg-amber-950/40 transition-colors text-amber-900 dark:text-amber-100 hover:text-amber-700 dark:hover:text-amber-200 border border-transparent hover:border-amber-200 dark:hover:border-amber-800 cursor-pointer"
+                className="group relative overflow-hidden rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20 text-left w-full"
                 title={followup}
               >
-                {followup}
+                {/* Animated background gradient */}
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-pink-600/5 to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                
+                {/* Border gradient */}
+                <div className="absolute inset-0 rounded-xl border border-purple-500/30 group-hover:border-purple-400/60 transition-colors duration-300"></div>
+                
+                {/* Content */}
+                <div className="relative px-4 py-3 flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-1">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:from-purple-500/40 group-hover:to-pink-500/40 transition-all duration-300">
+                      <span className="text-purple-300 group-hover:text-purple-200 transition-colors font-bold">?</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-purple-200 group-hover:text-purple-100 transition-colors line-clamp-2">
+                      {followup}
+                    </p>
+                  </div>
+                  
+                  <div className="flex-shrink-0 mt-1">
+                    <div className="w-5 h-5 rounded-full bg-purple-500/20 group-hover:bg-purple-500/40 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
+                      <span className="text-purple-300 text-xs">→</span>
+                    </div>
+                  </div>
+                </div>
               </button>
             ))}
           </div>

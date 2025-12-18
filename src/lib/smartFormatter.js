@@ -1,108 +1,90 @@
 /**
  * Smart Text Formatter
- * Intelligently formats AI responses with bold, italic, and justified text
+ * Intelligently structures AI responses with headers, sections, paragraphs, and formatting
  */
 
 /**
  * List of keywords that should be bolded
  */
 const BOLD_KEYWORDS = [
-  // Historical terms
-  'World War II', 'WWII', 'WW2',
-  'Adolf Hitler', 'Hitler',
-  'September 1, 1939', '1939',
-  'Poland', 'Germany', 'Britain', 'France', 'Europe',
-  'Allies', 'Axis',
-  'Dunkirk', 'D-Day', 'June 6, 1944',
-  'Nazi', 'Nazi troops',
-  'United Nations', 'UN',
-  
-  // Web/Tech terms
   'WordPress', 'WooCommerce', 'portfolio website', 'personal portfolio',
-  'ecommerce', 'e-commerce', 'website', 'web',
-  'theme', 'plugin', 'design', 'layout',
-  'content', 'page', 'post', 'product',
-  'integration', 'platform', 'system',
-  'SEO', 'responsive', 'mobile',
-  'user experience', 'UX', 'UI',
-  
-  // General important terms
-  'turning point', 'key event', 'key features', 'key milestone',
-  'invasion', 'liberation', 'expansion',
-  'peace', 'power', 'strategy',
-  'leadership', 'alliance', 'partnership',
-  'victory', 'defeat', 'success', 'challenge',
-  'important', 'significant', 'critical',
-  'crucial', 'essential', 'fundamental',
-  'major', 'primary', 'main', 'core',
-  'step', 'phase', 'stage', 'milestone',
-  'goal', 'objective', 'target', 'timeline'
+  'ecommerce', 'e-commerce', 'website', 'web', 'mobile app',
+  'theme', 'plugin', 'design', 'layout', 'strategy',
+  'content', 'page', 'post', 'product', 'marketing',
+  'integration', 'platform', 'system', 'campaign',
+  'SEO', 'responsive', 'mobile', 'social media',
+  'user experience', 'UX', 'UI', 'target audience',
+  'key features', 'key milestone', 'key event',
+  'success', 'challenge', 'important', 'significant',
+  'crucial', 'essential', 'fundamental', 'critical',
+  'step', 'phase', 'stage', 'milestone', 'timeline',
+  'goal', 'objective', 'target', 'leadership', 'partnership'
 ]
 
 /**
- * List of phrases that should be italicized
+ * Identify section headers from content
  */
-const ITALIC_PHRASES = [
-  'Picture yourself',
-  'Can you guess',
-  'much like',
-  'often referred to',
-  'Despite losing',
-  'boosted spirits',
-  'fierce resistance',
-  'combined efforts',
-  'mutual understanding',
-  'shared prosperity',
-  'sustainable development',
-  'in essence',
-  'for example',
-  'such as',
-  'including',
-  'particularly',
-  'specifically',
-  'notably',
-  'importantly',
-  'furthermore',
-  'moreover',
-  'therefore',
-  'consequently',
-  'as a result',
-  'in conclusion',
-  'to summarize'
-]
-
-/**
- * Split text into paragraphs
- */
-function splitIntoParagraphs(text) {
-  // Split by double newlines or long sentences
-  const paragraphs = text
-    .split(/\n\n+/)
-    .filter(p => p.trim().length > 0)
-    .map(p => p.trim())
+function identifySections(text) {
+  const sections = []
   
-  // If no paragraph breaks, split long text into chunks
-  if (paragraphs.length === 1) {
-    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text]
-    const chunks = []
-    let currentChunk = ''
-    
-    sentences.forEach(sentence => {
-      currentChunk += sentence
-      if (currentChunk.length > 300) {
-        chunks.push(currentChunk.trim())
-        currentChunk = ''
-      }
-    })
-    
-    if (currentChunk.trim()) {
-      chunks.push(currentChunk.trim())
+  // Check for common section indicators
+  const sectionPatterns = [
+    { pattern: /introduction|overview|background/i, title: 'Introduction' },
+    { pattern: /strategy|approach|method/i, title: 'Strategy & Approach' },
+    { pattern: /step|phase|stage|process/i, title: 'Implementation Steps' },
+    { pattern: /benefit|advantage|feature|key point/i, title: 'Key Benefits & Features' },
+    { pattern: /challenge|obstacle|issue|problem/i, title: 'Challenges & Solutions' },
+    { pattern: /timeline|schedule|deadline/i, title: 'Timeline & Milestones' },
+    { pattern: /target|audience|market|customer/i, title: 'Target Audience' },
+    { pattern: /channel|platform|media|social/i, title: 'Channels & Platforms' },
+    { pattern: /content|creative|execution|message/i, title: 'Content & Creative Strategy' },
+    { pattern: /budget|cost|investment|resource/i, title: 'Budget & Resources' },
+    { pattern: /metric|measure|success|kpi/i, title: 'Success Metrics' },
+    { pattern: /conclusion|summary|next step|recommendation/i, title: 'Conclusion & Next Steps' }
+  ]
+  
+  sectionPatterns.forEach(({ pattern, title }) => {
+    if (pattern.test(text)) {
+      sections.push(title)
     }
+  })
+  
+  return sections
+}
+
+/**
+ * Split text into sentences
+ */
+function splitIntoSentences(text) {
+  return text.match(/[^.!?]+[.!?]+/g) || [text]
+}
+
+/**
+ * Group sentences into logical paragraphs
+ */
+function groupIntoParagraphs(sentences) {
+  const paragraphs = []
+  let currentParagraph = []
+  
+  sentences.forEach((sentence, idx) => {
+    currentParagraph.push(sentence.trim())
     
-    return chunks
+    // Create a new paragraph every 3-4 sentences or at natural breaks
+    if (currentParagraph.length >= 3 || 
+        sentence.match(/[.!?]\s*$/) && 
+        (idx === sentences.length - 1 || Math.random() > 0.7)) {
+      if (currentParagraph.length > 0) {
+        paragraphs.push(currentParagraph.join(' '))
+        currentParagraph = []
+      }
+    }
+  })
+  
+  if (currentParagraph.length > 0) {
+    paragraphs.push(currentParagraph.join(' '))
   }
   
-  return paragraphs
+  return paragraphs.filter(p => p.trim().length > 0)
 }
 
 /**
@@ -120,95 +102,84 @@ function applyBoldFormatting(text) {
 }
 
 /**
- * Apply italic formatting to phrases
- */
-function applyItalicFormatting(text) {
-  let formatted = text
-  
-  ITALIC_PHRASES.forEach(phrase => {
-    const regex = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi')
-    formatted = formatted.replace(regex, `*${phrase}*`)
-  })
-  
-  return formatted
-}
-
-/**
- * Identify and create headers for major topics
- */
-function identifyTopics(text) {
-  const topics = []
-  
-  if (text.toLowerCase().includes('cause') || text.toLowerCase().includes('beginning')) {
-    topics.push('Causes & Beginning')
-  }
-  if (text.toLowerCase().includes('turning point') || text.toLowerCase().includes('key event')) {
-    topics.push('Key Turning Points')
-  }
-  if (text.toLowerCase().includes('impact') || text.toLowerCase().includes('effect')) {
-    topics.push('Impact & Consequences')
-  }
-  if (text.toLowerCase().includes('alliance') || text.toLowerCase().includes('player')) {
-    topics.push('Major Players & Alliances')
-  }
-  if (text.toLowerCase().includes('victory') || text.toLowerCase().includes('end')) {
-    topics.push('Victory & Aftermath')
-  }
-  
-  return topics
-}
-
-/**
- * Format text with proper structure
+ * Create structured response with headers and sections
  */
 export function smartFormatText(text) {
-  if (!text) return ''
+  if (!text || text.length === 0) return []
   
-  // Split into paragraphs
-  const paragraphs = splitIntoParagraphs(text)
+  // Split into sentences
+  const sentences = splitIntoSentences(text)
   
-  // Format each paragraph
-  const formattedParagraphs = paragraphs.map(para => {
-    let formatted = para
+  // Group into paragraphs
+  const paragraphs = groupIntoParagraphs(sentences)
+  
+  // Identify sections
+  const sections = identifySections(text)
+  
+  // Build structured response
+  const structured = []
+  let sectionIndex = 0
+  
+  // Add introduction paragraph
+  if (paragraphs.length > 0) {
+    structured.push(applyBoldFormatting(paragraphs[0]))
+  }
+  
+  // Distribute remaining paragraphs across sections
+  const remainingParagraphs = paragraphs.slice(1)
+  const paragraphsPerSection = Math.ceil(remainingParagraphs.length / Math.max(sections.length, 1))
+  
+  sections.forEach((section, idx) => {
+    // Add section header
+    structured.push(`## ${section}`)
     
-    // Apply bold formatting
-    formatted = applyBoldFormatting(formatted)
+    // Add paragraphs for this section
+    const startIdx = idx * paragraphsPerSection
+    const endIdx = Math.min(startIdx + paragraphsPerSection, remainingParagraphs.length)
     
-    // Apply italic formatting
-    formatted = applyItalicFormatting(formatted)
-    
-    return formatted
+    for (let i = startIdx; i < endIdx; i++) {
+      if (remainingParagraphs[i]) {
+        structured.push(applyBoldFormatting(remainingParagraphs[i]))
+      }
+    }
   })
   
-  return formattedParagraphs
+  // Add any remaining paragraphs
+  const lastSectionEnd = sections.length * paragraphsPerSection
+  if (lastSectionEnd < remainingParagraphs.length) {
+    if (sections.length === 0) {
+      structured.push('## Key Points')
+    }
+    for (let i = lastSectionEnd; i < remainingParagraphs.length; i++) {
+      structured.push(applyBoldFormatting(remainingParagraphs[i]))
+    }
+  }
+  
+  return structured.filter(item => item && item.trim().length > 0)
 }
 
 /**
- * Convert markdown-style formatting to React components
+ * Parse markdown-style formatting
  */
 export function parseFormattedText(text) {
   if (!text) return null
   
-  // Split by markdown patterns
   const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g)
   
   return parts.map((part, idx) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      // Bold text
       return {
         type: 'bold',
         content: part.slice(2, -2),
         key: idx
       }
     } else if (part.startsWith('*') && part.endsWith('*')) {
-      // Italic text
       return {
         type: 'italic',
         content: part.slice(1, -1),
         key: idx
       }
     } else {
-      // Regular text
       return {
         type: 'text',
         content: part,
@@ -218,40 +189,7 @@ export function parseFormattedText(text) {
   })
 }
 
-/**
- * Create React JSX elements from formatted text
- */
-export function createFormattedElements(text) {
-  const parts = parseFormattedText(text)
-  
-  return parts.map((part, idx) => {
-    switch (part.type) {
-      case 'bold':
-        return { type: 'bold', content: part.content, key: idx }
-      case 'italic':
-        return { type: 'italic', content: part.content, key: idx }
-      default:
-        return { type: 'text', content: part.content, key: idx }
-    }
-  })
-}
-
-/**
- * Main smart formatter function
- */
-export function formatResponseWithSmartFormatting(text) {
-  const formattedParagraphs = smartFormatText(text)
-  
-  return {
-    paragraphs: formattedParagraphs,
-    topics: identifyTopics(text),
-    formatted: formattedParagraphs.join('\n\n')
-  }
-}
-
 export default {
   smartFormatText,
-  parseFormattedText,
-  createFormattedElements,
-  formatResponseWithSmartFormatting
+  parseFormattedText
 }

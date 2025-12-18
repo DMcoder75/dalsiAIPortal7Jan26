@@ -6,6 +6,7 @@
 
 import React from 'react'
 import { ChevronDown, ChevronUp, CheckCircle2, Circle, Copy, ExternalLink } from 'lucide-react'
+import { applyProfessionalStyling } from '../lib/responseFormatter'
 
 /**
  * Format and display chat mode response
@@ -37,7 +38,10 @@ export const ChatModeResponse = ({ response, references, followups, onFollowupCl
         {typeof response === 'object' && response.$$typeof ? (
           <div className="text-sm leading-relaxed">{response}</div>
         ) : typeof response === 'string' ? (
-          <p className="whitespace-pre-wrap text-foreground text-sm leading-relaxed">{response}</p>
+          <div 
+            className="text-sm leading-relaxed space-y-3"
+            dangerouslySetInnerHTML={{ __html: applyProfessionalStyling(response) }}
+          />
         ) : (
           <div className="text-sm leading-relaxed">{response}</div>
         )}

@@ -61,6 +61,7 @@ export default function Experience() {
   const [loadingPrompts, setLoadingPrompts] = useState(true)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [loadingConversations, setLoadingConversations] = useState(false)
+  const [conversationEndpoint, setConversationEndpoint] = useState(null) // Track locked endpoint
   const messagesEndRef = useRef(null)
 
   const models = [
@@ -263,14 +264,23 @@ export default function Experience() {
 
       logger.info('🚀 [EXPERIENCE] Sending message with model:', selectedModel)
 
+      // Ensure we have a session ID
+      let sessionId = currentChat?.id
+      if (!sessionId) {
+        sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      }
+
       // Use new AI generation service with auto-detection
       let response
       try {
+        const shouldAutoDetect = !conversationEndpoint
+        
         response = await smartGenerate(inputValue, {
           mode: 'chat',
           use_history: true,
-          session_id: currentChat?.id || null,
-          autoDetect: true
+          session_id: sessionId,
+          autoDetect: shouldAutoDetect,
+          forceEndpoint: conversationEndpoint
         })
       } catch (apiError) {
         logger.error('❌ [EXPERIENCE] API error:', apiError)
@@ -288,6 +298,12 @@ export default function Experience() {
       let responseMode = 'chat'
 
       logger.info('📊 [EXPERIENCE] Full API response:', response)
+
+      // Lock the endpoint for this conversation on first message
+      if (!conversationEndpoint && response.category) {
+        setConversationEndpoint(response.category)
+        logger.info(`🔐 [EXPERIENCE] Locked conversation endpoint to: ${response.category}`)
+      }
 
       if (response.data) {
         // Extract references from multiple possible locations

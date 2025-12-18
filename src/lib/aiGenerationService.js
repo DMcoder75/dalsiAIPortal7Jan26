@@ -367,13 +367,17 @@ const getConversationEndpoint = (sessionId, detectedType) => {
  * @returns {Promise<Object>} AI response
  */
 export const smartGenerate = async (message, options = {}) => {
-  const { autoDetect = true, ...otherOptions } = options
+  const { autoDetect = true, forceEndpoint = null, ...otherOptions } = options
   const { session_id } = otherOptions
 
   try {
     let queryType = 'general'
 
-    if (autoDetect) {
+    // If forceEndpoint is provided, use it (conversation is locked)
+    if (forceEndpoint) {
+      queryType = forceEndpoint
+      logger.info(`🔒 [AI_SERVICE] Using forced endpoint: ${forceEndpoint}`)
+    } else if (autoDetect) {
       const detectedType = detectQueryType(message)
       // Get or lock the endpoint for this conversation
       queryType = getConversationEndpoint(session_id, detectedType)

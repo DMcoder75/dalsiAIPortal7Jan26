@@ -45,6 +45,7 @@ import {
 import ImplementationSummaryResponse from '../components/ImplementationSummaryResponse'
 import { callAIWithIntelligentContinuation, getChatIdForConversation, clearConversationChatId } from '../lib/intelligentApiCaller'
 import { saveMessageWithMetadata } from '../lib/chatManagementService'
+import { detectContinuation, referencesContext } from '../lib/continuationDetector'
 
 export default function Experience() {
   const { user, logout } = useAuth()
@@ -290,12 +291,20 @@ export default function Experience() {
         logger.info('🆔 [EXPERIENCE] Created new session ID:', sessionId)
       }
 
-      // Detect continuation and get stored chat_id
-      const continuationKeywords = ['continue', 'next', 'more', 'go on', 'tell me more']
-      const isContinuation = continuationKeywords.some(kw => inputValue.toLowerCase().includes(kw))
+      // Smart continuation detection
+      const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null
+      const lastContent = lastMessage?.role === 'assistant' ? lastMessage.content : ''
+      
+      const continuationAnalysis = detectContinuation(inputValue, lastContent)
+      const isContinuation = continuationAnalysis.isContinuation
       const storedChatId = isContinuation ? conversationChatIds[sessionId] : null
       
-      logger.debug('🔍 [EXPERIENCE] Continuation:', isContinuation, 'ChatId:', !!storedChatId)
+      logger.debug('🔍 [EXPERIENCE] Continuation analysis:', {
+        isContinuation,
+        confidence: continuationAnalysis.confidence,
+        reason: continuationAnalysis.reason,
+        hasChatId: !!storedChatId
+      })
       
       // Use new AI generation service with auto-detection
       let response
@@ -631,14 +640,27 @@ export default function Experience() {
                         followups={msg.followups}
                         onFollowupClick={(followupQuestion) => {
                           logger.info('🔗 [EXPERIENCE] Followup clicked:', followupQuestion)
+                          
+                          // Use smart continuation detection for followup
+                          const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null
+                          const lastAIContent = lastMsg?.role === 'assistant' ? lastMsg.content : ''
+                          const followupAnalysis = detectContinuation(followupQuestion, lastAIContent)
+                          
+                          logger.info('📊 [EXPERIENCE] Followup analysis:', {
+                            question: followupQuestion,
+                            isContinuation: followupAnalysis.isContinuation,
+                            confidence: followupAnalysis.confidence
+                          })
+                          
+                          // Set input and send
                           setInputValue(followupQuestion)
-                          // Auto-send the followup question
                           setTimeout(() => {
-                            setInputValue(followupQuestion)
-                            // Trigger send by simulating the handleSendMessage
-                            const event = new Event('followup-send')
-                            window.dispatchEvent(event)
-                          }, 100)
+                            // Simulate sending by calling handleSendMessage
+                            const sendBtn = document.querySelector('[data-send-followup="true"]')
+                            if (sendBtn) {
+                              sendBtn.click()
+                            }
+                          }, 50)
                         }}
                       />
                     )}
@@ -691,6 +713,7 @@ export default function Experience() {
               <button
                 onClick={handleSendMessage}
                 disabled={loading || !inputValue.trim()}
+                data-send-followup="true"
                 className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground font-semibold p-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-lg"
               >
                 <Send className="w-5 h-5" />

@@ -65,8 +65,8 @@ export default function Experience() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [loadingConversations, setLoadingConversations] = useState(false)
   const [conversationEndpoint, setConversationEndpoint] = useState(null) // Track locked endpoint
-  const [conversationChatIds, setConversationChatIds] = useState({}) // Track chat_id per conversation
   const [currentSessionId, setCurrentSessionId] = useState(null) // Persistent session ID for conversation
+  const conversationChatIdsRef = useRef({}) // Track chat_id per conversation (using ref for immediate access)
   const messagesEndRef = useRef(null)
 
   const models = [
@@ -297,7 +297,7 @@ export default function Experience() {
       
       const continuationAnalysis = detectContinuation(inputValue, lastContent)
       const isContinuation = continuationAnalysis.isContinuation
-      const storedChatId = isContinuation ? conversationChatIds[sessionId] : null
+      const storedChatId = isContinuation ? conversationChatIdsRef.current[sessionId] : null
       
       logger.debug('🔍 [EXPERIENCE] Continuation analysis:', {
         isContinuation,
@@ -338,11 +338,9 @@ export default function Experience() {
       
       // Store chat_id for this conversation if provided
       if (response.data?.chat_id) {
-        setConversationChatIds(prev => ({
-          ...prev,
-          [sessionId]: response.data.chat_id
-        }))
+        conversationChatIdsRef.current[sessionId] = response.data.chat_id
         logger.info('💾 [EXPERIENCE] Stored chat_id for conversation:', response.data.chat_id)
+        logger.debug('📊 [EXPERIENCE] Chat ID storage:', conversationChatIdsRef.current)
       }
 
       // Lock the endpoint for this conversation on first message

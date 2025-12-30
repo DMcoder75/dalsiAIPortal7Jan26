@@ -297,13 +297,22 @@ export default function Experience() {
       
       const continuationAnalysis = detectContinuation(inputValue, lastContent)
       const isContinuation = continuationAnalysis.isContinuation
+      
+      // DEBUG: Log the ref state before retrieval
+      logger.debug('🔍 [EXPERIENCE] DEBUG - Ref state:', {
+        refContent: conversationChatIdsRef.current,
+        sessionId,
+        lookupResult: conversationChatIdsRef.current[sessionId]
+      })
+      
       const storedChatId = isContinuation ? conversationChatIdsRef.current[sessionId] : null
       
       logger.debug('🔍 [EXPERIENCE] Continuation analysis:', {
         isContinuation,
         confidence: continuationAnalysis.confidence,
         reason: continuationAnalysis.reason,
-        hasChatId: !!storedChatId
+        hasChatId: !!storedChatId,
+        storedChatId: storedChatId || 'NOT FOUND'
       })
       
       // Use new AI generation service with auto-detection

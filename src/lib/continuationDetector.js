@@ -52,8 +52,13 @@ export const detectContinuation = (question, previousAnswer = '') => {
   // Calculate confidence (0-100)
   const confidence = Math.round((score / maxScore) * 100)
   
-  // Threshold: if 2+ patterns match, it's likely a continuation
-  const isContinuation = score >= 2
+  // Check for direct continuation keywords (highest priority)
+  const hasDirectKeyword = continuationPatterns.direct.some(kw => lowerQuestion.includes(kw))
+  
+  // Threshold: 
+  // 1. If direct keyword found (continue, next, more, etc.) → ALWAYS continuation
+  // 2. Otherwise, if 2+ patterns match → continuation
+  const isContinuation = hasDirectKeyword || score >= 2
   
   return {
     isContinuation,

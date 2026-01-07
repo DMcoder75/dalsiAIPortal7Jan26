@@ -22,31 +22,38 @@ export const FrequentQueries = ({ onQuerySelect }) => {
       setLoading(true)
       setError(null)
 
+      console.log('📊 [FREQUENT_QUERIES] Starting fetch...')
+      
       const response = await fetch('https://api.neodalsi.com/api/frequent-queries?limit=5', {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': localStorage.getItem('apiKey') || ''
+          'Content-Type': 'application/json'
         }
       })
+
+      console.log('📊 [FREQUENT_QUERIES] Response status:', response.status)
 
       if (!response.ok) {
         throw new Error(`Failed to fetch frequent queries: ${response.status}`)
       }
 
       const data = await response.json()
-      logger.info('📊 [FREQUENT_QUERIES] Fetched popular prompts:', data.frequent_queries?.length || 0)
+      console.log('📊 [FREQUENT_QUERIES] Fetched data:', data)
+      console.log('📊 [FREQUENT_QUERIES] Queries count:', data.frequent_queries?.length || 0)
       
       setQueries(data.frequent_queries || [])
     } catch (err) {
-      logger.error('❌ [FREQUENT_QUERIES] Error fetching queries:', err.message)
+      console.error('❌ [FREQUENT_QUERIES] Error fetching queries:', err)
       setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
+  console.log('📊 [FREQUENT_QUERIES] Render - loading:', loading, 'queries:', queries?.length || 0)
+
   if (loading) {
+    console.log('📊 [FREQUENT_QUERIES] Showing loading state')
     return (
       <div className="px-4 py-3 text-center">
         <Loader className="w-4 h-4 animate-spin mx-auto text-purple-400" />
@@ -55,8 +62,11 @@ export const FrequentQueries = ({ onQuerySelect }) => {
   }
 
   if (!queries || queries.length === 0) {
+    console.log('📊 [FREQUENT_QUERIES] No queries to display')
     return null
   }
+
+  console.log('📊 [FREQUENT_QUERIES] Rendering', queries.length, 'queries')
 
   return (
     <div className="mt-6 px-3 py-4 border-t border-purple-500/20">
@@ -64,7 +74,7 @@ export const FrequentQueries = ({ onQuerySelect }) => {
       <div className="flex items-center gap-2 mb-3 px-1">
         <Sparkles className="w-4 h-4 text-purple-400" />
         <h3 className="text-xs font-semibold text-purple-300 tracking-wide uppercase">
-          Popular Prompts
+          Popular Prompts ({queries.length})
         </h3>
       </div>
 

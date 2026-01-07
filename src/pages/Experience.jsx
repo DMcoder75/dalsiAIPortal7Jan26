@@ -485,19 +485,18 @@ export default function Experience() {
             onDeleteConversation={handleDeleteChat}
             isLoading={loadingConversations}
           />
-          
-          {/* Frequent Queries Section */}
-          <FrequentQueries 
-            onQuerySelect={(query) => {
-              setInputValue(query)
-              // Auto-focus input for better UX
-              setTimeout(() => {
-                const inputElement = document.querySelector('textarea[placeholder*="Ask"]')
-                if (inputElement) inputElement.focus()
-              }, 100)
-            }}
-          />
         </div>
+        
+        {/* Frequent Queries Section - Outside scroll container */}
+        <FrequentQueries 
+          onQuerySelect={(query) => {
+            setInputValue(query)
+            setTimeout(() => {
+              const inputElement = document.querySelector('textarea[placeholder*="Ask"]')
+              if (inputElement) inputElement.focus()
+            }, 100)
+          }}
+        />
 
         {/* User Profile / Auth Section */}
         <div className="p-4 border-t border-border">

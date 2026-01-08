@@ -6,6 +6,7 @@ import {
   saveTutorSession, 
   GRADE_LEVELS 
 } from '../lib/tutorService'
+import { FormattedResponseContent } from './FormattedResponseContent'
 import logger from '../lib/logger'
 
 export default function TutorModal({ isOpen, onClose, user }) {
@@ -285,9 +286,9 @@ export default function TutorModal({ isOpen, onClose, user }) {
             <div className="space-y-4 bg-muted/50 border border-border rounded-lg p-4">
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">Explanation: {explanation.topic}</h3>
-                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                  {explanation.explanation}
-                </p>
+                <div className="text-sm text-foreground leading-relaxed">
+                  <FormattedResponseContent text={explanation.explanation} />
+                </div>
               </div>
 
               {/* Action Buttons */}
@@ -315,9 +316,9 @@ export default function TutorModal({ isOpen, onClose, user }) {
             <div className="space-y-4 bg-muted/50 border border-border rounded-lg p-4">
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">Practice Questions: {practiceQuestions.topic}</h3>
-                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                  {practiceQuestions.questions}
-                </p>
+                <div className="text-sm text-foreground leading-relaxed">
+                  <FormattedResponseContent text={practiceQuestions.questions} />
+                </div>
               </div>
 
               {/* Action Buttons */}

@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { X, Send, Loader, Copy, Download, Save, AlertCircle, Volume2 } from 'lucide-react'
 import { translateText, saveTranslation, SUPPORTED_LANGUAGES } from '../lib/translatorService'
+import { FormattedResponseContent } from './FormattedResponseContent'
 import logger from '../lib/logger'
 
 export default function TranslatorModal({ isOpen, onClose, user }) {
@@ -234,9 +235,9 @@ export default function TranslatorModal({ isOpen, onClose, user }) {
                 <h3 className="text-sm font-semibold text-foreground mb-2">
                   Translation to {translatedText.target_language_name}
                 </h3>
-                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                  {translatedText.translated_text}
-                </p>
+                <div className="text-sm text-foreground leading-relaxed">
+                  <FormattedResponseContent text={translatedText.translated_text} />
+                </div>
               </div>
 
               {/* Translation Stats */}

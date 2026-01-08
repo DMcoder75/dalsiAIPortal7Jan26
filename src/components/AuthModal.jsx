@@ -9,7 +9,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { subscriptionManager } from '../lib/subscriptionManager'
 import { updateTrackerTier } from '../lib/rateLimitService'
 import { migrateGuestConversations } from '../lib/guestMigrationService'
+import { migrateGuestDataToRegistered, clearGuestSessionAfterMigration } from '../lib/guestToRegisteredMigration'
 import { checkUserExists, checkUserExistsByGoogleId } from '../lib/userExistenceService'
+import { getGuestUserId } from '../lib/guestUser'
 import GoogleDataDisclosure from './GoogleDataDisclosure'
 import GoogleProfileSetup from './GoogleProfileSetup'
 import logo from '../assets/DalSiAILogo2.png'
@@ -162,168 +164,22 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
       // Store JWT token and user info
       localStorage.setItem('jwt_token', data.token)
       localStorage.setItem('user_info', JSON.stringify(data.user))
-      localStorage.setItem('user_type', 'registered')
-
-      // Clear guest data after successful migration
-      localStorage.removeItem('api_key')
-      localStorage.removeItem('guest_user_id')
-
-      // Create initial free tier subscription for new user
-      console.log('🎁 [AUTH_MODAL] Creating initial free subscription...')
-      try {
-        await subscriptionManager.createInitialSubscription(data.user.id)
-        console.log('✅ [AUTH_MODAL] Initial subscription created')
-      } catch (subError) {
-        console.error('⚠️ [AUTH_MODAL] Error creating subscription:', subError)
-        // Don't fail signup if subscription creation fails
-      }
-
-      // Initialize rate limit tracker for new user
-      console.log('📊 [AUTH_MODAL] Initializing rate limit tracker...')
-      try {
-        updateTrackerTier(data.user.subscription_tier || 'free')
-        console.log('✅ [AUTH_MODAL] Rate limit tracker initialized')
-      } catch (rateLimitError) {
-        console.error('⚠️ [AUTH_MODAL] Error initializing rate limits:', rateLimitError)
-        // Don't fail signup if rate limit init fails
-      }
-
-      // Migrate guest conversations
-      console.log('🔄 [AUTH_MODAL] Starting guest conversation migration...')
-      try {
-        const migrationResult = await migrateGuestConversations(data.user.id, data.token)
-        if (migrationResult.success && migrationResult.migratedCount > 0) {
-          console.log('✅ [AUTH_MODAL] Migrated conversations:', migrationResult.migratedCount)
-        }
-      } catch (migrationError) {
-        console.error('⚠️ [AUTH_MODAL] Error migrating guest conversations:', migrationError)
-      }
-
-      // Show migration message if applicable
-      let successMsg = 'Account created successfully! Check your email to verify your account.'
-      if (data.migration && data.migration.conversations_migrated > 0) {
-        successMsg = `${data.migration.message} Also check your email to verify your account.`
-        console.log('✅ [AUTH_MODAL] Guest conversations migrated:', data.migration.conversations_migrated)
-      }
-      
-      successMsg += ' Redirecting...'
-
-      // Show success message
-      setSuccessMessage(successMsg)
-      
-      if (onSuccess) onSuccess()
-      onClose()
-
-      // Reload after a short delay
-      setTimeout(() => {
-        window.location.reload()
-      }, 1000)
-
-    } catch (error) {
-      console.error('❌ [AUTH_MODAL] SIGNUP ERROR:', error)
-      
-      let userMessage = error.message
-      
-      if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch')) {
-        userMessage = 'Network error. Please check your connection and try again.'
-      } else if (error.message.includes('already exists')) {
-        userMessage = 'This email is already registered. Please login instead.'
-      } else if (!error.message) {
-        userMessage = 'Signup failed. Please try again.'
-      }
-      
-      setError(userMessage)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleGmailSignup = async () => {
-    console.log('📧 [AUTH_MODAL] handleGmailSignup started')
-    setIsProcessingGoogle(true)
-    setError('')
-    
-    try {
-      // For signup, we don't have email yet, so we go directly to Gmail
-      // The backend will check if user exists and handle accordingly
-      setIsNewGoogleUser(true) // Assume new user for signup flow
-      setShowGoogleDisclosure(true)
-    } catch (error) {
-      console.error('❌ [AUTH_MODAL] Error in Gmail signup:', error)
-      setError('Failed to initiate Gmail signup')
-      setIsProcessingGoogle(false)
-    }
-  }
-
-  const handleGoogleDisclosureContinue = async () => {
-    console.log('🔐 [AUTH_MODAL] User accepted disclosure, redirecting to Gmail...')
-    setIsProcessingGoogle(true)
-    try {
-      await signupWithGmail()
-    } catch (error) {
-      console.error('❌ [AUTH_MODAL] GMAIL SIGNUP ERROR:', error)
-      setError(error.message || 'Gmail signup failed. Please try again.')
-      setShowGoogleDisclosure(false)
-      setIsProcessingGoogle(false)
-    }
-  }
-
-  const handleGmailLogin = async () => {
-    console.log('📧 [AUTH_MODAL] handleGmailLogin started')
-    setIsProcessingGoogle(false) // Don't process yet, just show disclosure
-    setError('')
-    
-    try {
-      // Show disclosure modal for login too
-      setIsNewGoogleUser(false) // Mark as login flow (existing user)
-      setShowGoogleDisclosure(true) // Show disclosure modal
-    } catch (error) {
-      console.error('❌ [AUTH_MODAL] Error in Gmail login:', error)
-      setError('Failed to initiate Gmail login')
-      setIsProcessingGoogle(false)
-    }
-  }
-
-  const handleGoogleLoginContinue = async () => {
-    console.log('🔐 [AUTH_MODAL] User accepted disclosure, redirecting to Gmail for login...')
-    setIsProcessingGoogle(true)
-    try {
-      await loginWithGmail()
-    } catch (error) {
-      console.error('❌ [AUTH_MODAL] GMAIL LOGIN ERROR:', error)
-      setError(error.message || 'Gmail login failed. Please try again.')
-      setShowGoogleDisclosure(false)
-      setIsProcessingGoogle(false)
-    }
-  }
-
-
-  const handleGoogleProfileSubmit = async (profileData) => {
-    console.log('📝 [AUTH_MODAL] Submitting Google profile setup...')
-    setIsProcessingGoogle(true)
-    try {
-      const response = await fetch('https://api.neodalsi.com/api/auth/register-google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: profileData.email,
-          first_name: profileData.firstName,
-          last_name: profileData.lastName,
-          company_name: profileData.companyName || null,
-          google_id: googleData.sub,
-          profile_picture: googleData.picture,
-          email_verified: true
-        })
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Registration failed')
-      if (!data.success || !data.token || !data.user) throw new Error('Invalid response')
       localStorage.setItem('jwt_token', data.token)
       localStorage.setItem('user_info', JSON.stringify(data.user))
       localStorage.setItem('user_type', 'registered')
+      const guestUserId = getGuestUserId()
+      if (guestUserId) {
+        try {
+          const migrationResult = await migrateGuestDataToRegistered(guestUserId, data.user.id, data.user.email, data.token)
+          if (migrationResult.success) {
+            console.log('✅ Guest data migrated')
+            clearGuestSessionAfterMigration()
+          }
+        } catch (e) { console.error('Guest migration error', e) }
+      }
       try {
         await migrateGuestConversations(data.user.id, data.token)
-      } catch (e) { console.error('Migration error:', e) }
+      } catch (e) { console.error('Migration error', e) }
       try {
         await subscriptionManager.createInitialSubscription(data.user.id)
       } catch (e) { console.error('Subscription error:', e) }

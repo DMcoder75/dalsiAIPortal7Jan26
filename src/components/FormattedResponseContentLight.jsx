@@ -149,8 +149,36 @@ export const FormattedResponseContentLight = ({ text }) => {
           )
         }
 
-        // Handle regular paragraphs
+        // Handle regular paragraphs (may contain bullet points)
         if (item.type === 'paragraph') {
+          // Check if paragraph contains bullet points
+          const lines = item.content.split('\n')
+          const hasBulletPoints = lines.some(line => /^\s*[-*+]\s+/.test(line))
+          
+          if (hasBulletPoints) {
+            // Parse as list
+            const listItems = []
+            lines.forEach(line => {
+              const match = line.match(/^\s*[-*+]\s+(.+)$/)
+              if (match) {
+                listItems.push(match[1].trim())
+              }
+            })
+            
+            if (listItems.length > 0) {
+              return (
+                <ul key={idx} className="space-y-2 ml-6 text-foreground">
+                  {listItems.map((listItem, listIdx) => (
+                    <li key={listIdx} className="text-sm leading-relaxed flex gap-3">
+                      <span className="text-primary font-bold flex-shrink-0">•</span>
+                      <span>{renderFormattedTextLight(listItem)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )
+            }
+          }
+          
           return (
             <p
               key={idx}

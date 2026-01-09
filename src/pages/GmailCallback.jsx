@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
 import { handleGmailCallback } from '../lib/jwtAuth'
 import { subscriptionManager } from '../lib/subscriptionManager'
 import { useAuth } from '../contexts/AuthContext'
 import logger from '../lib/logger'
 
 export default function GmailCallback() {
-  const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
   const { login } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -17,12 +14,14 @@ export default function GmailCallback() {
     const processCallback = async () => {
       // Prevent duplicate processing
       if (isProcessing) {
-        console.log('⏳ [GMAIL_CALLBACK] Already processing, skipping duplicate call')
+        console.log('⛳ [GMAIL_CALLBACK] Already processing, skipping duplicate call')
         return
       }
 
       try {
         setIsProcessing(true)
+        // Get search params from URL (not using React Router)
+        const searchParams = new URLSearchParams(window.location.search)
         const code = searchParams.get('code')
         const state = searchParams.get('state')
         const errorParam = searchParams.get('error')
@@ -119,7 +118,7 @@ export default function GmailCallback() {
     }
 
     processCallback()
-  }, [searchParams, navigate, login, isProcessing])
+  }, [isProcessing, login])
 
   if (loading) {
     return (

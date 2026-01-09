@@ -47,6 +47,8 @@ export default function Router() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const { user } = useAuth() // Subscribe to auth changes to trigger re-renders
 
+  console.log('🔍 DEBUG: Router render - currentPath:', currentPath)
+  console.log('🔍 DEBUG: window.location.pathname:', window.location.pathname)
   console.log('Router render - user:', user)
 
   useEffect(() => {
@@ -71,8 +73,10 @@ export default function Router() {
   window.showAuth = showAuth
 
   const renderPage = () => {
+    console.log('🔍 DEBUG: renderPage called with currentPath:', currentPath)
     switch (currentPath) {
       case '/auth/gmail/callback':
+        console.log('🔍 DEBUG: Matched /auth/gmail/callback route')
         return <GmailCallback />
       
       case '/chat':

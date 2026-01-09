@@ -488,22 +488,28 @@ export const handleGmailCallback = async (code, state) => {
     // Get guest_session_id from localStorage for migration
     const guestUserId = localStorage.getItem('guest_session_id');
     console.log('📝 Guest Session ID:', guestUserId ? 'present' : 'not present');
+    console.log('🔍 DEBUG: Actual guest_session_id value:', guestUserId);
 
     // Exchange authorization code for JWT token
     console.log('🔄 Exchanging code for JWT token...');
+    const requestBody = {
+      code,
+      state,
+      guest_user_id: guestUserId
+    };
+    console.log('📤 DEBUG: Request body being sent to backend:', requestBody);
+    
     const response = await fetch(`${API_BASE_URL}/api/auth/gmail/callback`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        code,
-        state,
-        guest_user_id: guestUserId
-      })
+      body: JSON.stringify(requestBody)
     });
 
     const data = await response.json();
+    console.log('📥 DEBUG: Response from backend:', data);
+    console.log('🔍 DEBUG: Conversations migrated count:', data.conversations_migrated);
 
     if (!response.ok) {
       console.error('❌ Gmail callback failed:', data);

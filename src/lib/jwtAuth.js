@@ -486,7 +486,8 @@ export const handleGmailCallback = async (code, state) => {
     }
 
     // Get guest_session_id from localStorage for migration
-    const guestUserId = localStorage.getItem('guest_session_id');
+    // Use dalsi_guest_session_id which is set by authService
+    const guestUserId = localStorage.getItem('dalsi_guest_session_id');
     console.log('📝 Guest Session ID:', guestUserId ? 'present' : 'not present');
     console.log('🔍 DEBUG: Actual guest_session_id value:', guestUserId);
     

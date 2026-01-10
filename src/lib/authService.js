@@ -25,10 +25,10 @@ export const getGuestApiKey = async () => {
   try {
     logger.info('🔑 [AUTH_SERVICE] Fetching guest API key...')
     
-    // Check if guest key already exists in sessionStorage
-    const existingKey = sessionStorage.getItem('dalsi_guest_key')
+    // Check if guest key already exists in localStorage
+    const existingKey = localStorage.getItem('dalsi_guest_key')
     if (existingKey) {
-      logger.info('✅ [AUTH_SERVICE] Using existing guest key from session')
+      logger.info('✅ [AUTH_SERVICE] Using existing guest key from localStorage')
       return JSON.parse(existingKey)
     }
 
@@ -36,10 +36,10 @@ export const getGuestApiKey = async () => {
     const sessionId = generateSessionId()
     logger.debug('📍 [AUTH_SERVICE] Generated session ID:', sessionId)
     
-    // Store session ID in sessionStorage BEFORE sending to backend
-    // This ensures we have it for OAuth callback later
-    sessionStorage.setItem('dalsi_guest_session_id', sessionId)
-    logger.debug('📑 [AUTH_SERVICE] Stored session ID in sessionStorage:', sessionId)
+    // Store session ID in localStorage BEFORE sending to backend
+    // This ensures we have it for OAuth callback later (persists across page reloads)
+    localStorage.setItem('dalsi_guest_session_id', sessionId)
+    logger.debug('📑 [AUTH_SERVICE] Stored session ID in localStorage:', sessionId)
 
     // Call guest key endpoint
     const response = await fetch(`${API_BASE_URL}/api/auth/guest-key`, {
@@ -65,10 +65,10 @@ export const getGuestApiKey = async () => {
     logger.debug('🔑 [AUTH_SERVICE] Guest user ID:', data.user_id)
     logger.debug('📊 [AUTH_SERVICE] Guest limits:', data.limits)
 
-    // Store in sessionStorage
-    sessionStorage.setItem('dalsi_guest_key', JSON.stringify(data))
-    sessionStorage.setItem('dalsi_guest_user_id', data.user_id)
-    sessionStorage.setItem('dalsi_guest_limits', JSON.stringify(data.limits))
+    // Store in localStorage (persists across page reloads)
+    localStorage.setItem('dalsi_guest_key', JSON.stringify(data))
+    localStorage.setItem('dalsi_guest_user_id', data.user_id)
+    localStorage.setItem('dalsi_guest_limits', JSON.stringify(data.limits))
 
     return data
 

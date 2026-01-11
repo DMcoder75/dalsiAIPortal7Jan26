@@ -40,18 +40,14 @@ export const fetchConversations = async (token) => {
     const data = await response.json()
     console.log('[CHAT_API] Response data:', data)
     
-    // Cache the conversations
-    if (data.success && data.data) {
-      cache.conversations = data.data
-      console.log('[CHAT_API] Conversations cached:', data.data.length)
-    } else if (Array.isArray(data)) {
-      // If response is directly an array
-      cache.conversations = data
-      console.log('[CHAT_API] Conversations cached (direct array):', data.length)
-      return data
+    // Cache the conversations - API returns { chats: [...], count, success }
+    if (data.success && data.chats) {
+      cache.conversations = data.chats
+      console.log('[CHAT_API] Conversations cached:', data.chats.length)
+      return data.chats
     }
 
-    return data.data || []
+    return []
   } catch (error) {
     console.error('[CHAT_API] Error fetching conversations:', error)
     // Return cached conversations if available
@@ -81,23 +77,25 @@ export const fetchConversationMessages = async (chatId, token) => {
       }
     })
 
+    console.log('[CHAT_API] Messages response status:', response.status)
+
     if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[CHAT_API] Messages error response:', errorText)
       throw new Error(`Failed to fetch messages: ${response.status}`)
     }
 
     const data = await response.json()
+    console.log('[CHAT_API] Messages response data:', data)
     
-    // Cache the messages
-    if (data.success && data.data) {
-      cache.messages[chatId] = data.data
-      console.log('[CHAT_API] Messages cached:', chatId, data.data.length)
-    } else if (Array.isArray(data)) {
-      cache.messages[chatId] = data
-      console.log('[CHAT_API] Messages cached (direct array):', chatId, data.length)
-      return data
+    // Cache the messages - API returns { messages: [...], count, chat_id, success }
+    if (data.success && data.messages) {
+      cache.messages[chatId] = data.messages
+      console.log('[CHAT_API] Messages cached:', chatId, data.messages.length)
+      return data.messages
     }
 
-    return data.data || []
+    return []
   } catch (error) {
     console.error('[CHAT_API] Error fetching messages:', error)
     // Return cached messages if available

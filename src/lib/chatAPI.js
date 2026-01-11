@@ -19,6 +19,8 @@ const cache = {
  */
 export const fetchConversations = async (token) => {
   try {
+    console.log('[CHAT_API] Fetching conversations with token:', token ? 'present' : 'missing')
+    
     const response = await fetch(`${API_BASE_URL}/api/chats`, {
       method: 'GET',
       headers: {
@@ -27,21 +29,31 @@ export const fetchConversations = async (token) => {
       }
     })
 
+    console.log('[CHAT_API] Response status:', response.status)
+
     if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[CHAT_API] Error response:', errorText)
       throw new Error(`Failed to fetch conversations: ${response.status}`)
     }
 
     const data = await response.json()
+    console.log('[CHAT_API] Response data:', data)
     
     // Cache the conversations
     if (data.success && data.data) {
       cache.conversations = data.data
-      console.log('✅ [CHAT_API] Conversations cached:', data.data.length)
+      console.log('[CHAT_API] Conversations cached:', data.data.length)
+    } else if (Array.isArray(data)) {
+      // If response is directly an array
+      cache.conversations = data
+      console.log('[CHAT_API] Conversations cached (direct array):', data.length)
+      return data
     }
 
     return data.data || []
   } catch (error) {
-    console.error('❌ [CHAT_API] Error fetching conversations:', error)
+    console.error('[CHAT_API] Error fetching conversations:', error)
     // Return cached conversations if available
     return Object.values(cache.conversations)
   }
@@ -57,7 +69,7 @@ export const fetchConversationMessages = async (chatId, token) => {
   try {
     // Check cache first
     if (cache.messages[chatId]) {
-      console.log('📦 [CHAT_API] Messages retrieved from cache:', chatId)
+      console.log('[CHAT_API] Messages retrieved from cache:', chatId)
       return cache.messages[chatId]
     }
 
@@ -78,12 +90,16 @@ export const fetchConversationMessages = async (chatId, token) => {
     // Cache the messages
     if (data.success && data.data) {
       cache.messages[chatId] = data.data
-      console.log('✅ [CHAT_API] Messages cached:', chatId, data.data.length)
+      console.log('[CHAT_API] Messages cached:', chatId, data.data.length)
+    } else if (Array.isArray(data)) {
+      cache.messages[chatId] = data
+      console.log('[CHAT_API] Messages cached (direct array):', chatId, data.length)
+      return data
     }
 
     return data.data || []
   } catch (error) {
-    console.error('❌ [CHAT_API] Error fetching messages:', error)
+    console.error('[CHAT_API] Error fetching messages:', error)
     // Return cached messages if available
     return cache.messages[chatId] || []
   }
@@ -119,10 +135,10 @@ export const deleteConversationAPI = async (chatId, token) => {
       delete cache.conversations[chatId]
     }
 
-    console.log('✅ [CHAT_API] Conversation deleted:', chatId)
+    console.log('[CHAT_API] Conversation deleted:', chatId)
     return data
   } catch (error) {
-    console.error('❌ [CHAT_API] Error deleting conversation:', error)
+    console.error('[CHAT_API] Error deleting conversation:', error)
     throw error
   }
 }
@@ -132,7 +148,7 @@ export const deleteConversationAPI = async (chatId, token) => {
  */
 export const invalidateConversationsCache = () => {
   cache.conversations = {}
-  console.log('🔄 [CHAT_API] Conversations cache cleared')
+  console.log('[CHAT_API] Conversations cache cleared')
 }
 
 /**
@@ -142,10 +158,10 @@ export const invalidateConversationsCache = () => {
 export const invalidateMessagesCache = (chatId = null) => {
   if (chatId) {
     delete cache.messages[chatId]
-    console.log('🔄 [CHAT_API] Messages cache cleared for:', chatId)
+    console.log('[CHAT_API] Messages cache cleared for:', chatId)
   } else {
     cache.messages = {}
-    console.log('🔄 [CHAT_API] All messages cache cleared')
+    console.log('[CHAT_API] All messages cache cleared')
   }
 }
 
